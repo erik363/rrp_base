@@ -6,21 +6,34 @@ RegisterNetEvent('rrp_base:outMarker')
 
 local Markers = {
     --["test"] = {
-        --["asd"] = {type = 1, coords = vector3(339.5, -1397.3, 32.5), x = 1.0, y = 1.0, z = 1.0, rgb = {r = 255, g = 0, b = 0, a = 200}, distance = 20.0}
+        --["asd"] = {type = 1, coords = vector3(339.5, -1397.3, 32.5), vector3(1.0, 1.0, 1.0), rgb = {r = 255, g = 0, b = 0, a = 200}, distance = 20.0}
     --}
 }
 
 AddEventHandler('onResourceStop', function(resourceName)
     if (GetCurrentResourceName() ~= resourceName) then
-      return
+        Markers[resourceName] = nil
+        return
     end
-    Markers[resourceName] = nil
 end)
   
-
-RegisterNetEvent('rrp_base:registerMarker', function()
-
+RegisterNetEvent('rrp_base:registerMarker')
+AddEventHandler('rrp_base:registerMarker', function(resourceName, markerId, t, coords, size, r, g, b, a, visDist)
+    local markerdatas = {
+        type = t,
+        coords = coords,
+        size = size,
+        rgb = {
+            r = math.floor(r),
+            g = math.floor(g),
+            b = math.floor(b),
+            a = math.floor(a),
+        },
+        visDist = visDist
+    }
+    addMarker(resourceName, markerId, markerdatas)
 end)
+
 
 function addMarker(resourceName, markerId, markerdatas)
     if Markers[resourceName] == nil then
@@ -63,7 +76,7 @@ Citizen.CreateThread(function()
     while true do
         for resourceName, data in pairs(Markers) do
             for markerId, marker in pairs(data) do
-                if #(playerCoords - marker.coords) < marker.distance then
+                if #(playerCoords - marker.coords) < marker.visDist then
                     drawMarker(resourceName, markerId)
                 end
             end
@@ -76,10 +89,13 @@ function drawMarker(resourceName, markerId)
     Citizen.CreateThread(function()
         local markerCache = Markers[resourceName][markerId]
         removeMarker(resourceName, markerId)
+        local x,y,z = markerCache.coords.x, markerCache.coords.y, markerCache.coords.z
+        local size = markerCache.size
+        local sx, sy, sz = size.x, size.y, size.z
         local coords = markerCache.coords
-        local visibilityDistance = markerCache.distance
+        local visibilityDistance = markerCache.visDist
         local distance = #(playerCoords - coords)
-        local markerSize = markerCache.x
+        local markerSize = size.x
         local rgb = markerCache.rgb
         local playerInMarker = false
         while distance <= visibilityDistance do
@@ -94,10 +110,9 @@ function drawMarker(resourceName, markerId)
                     TriggerEvent("rrp_base:outMarker", resourceName, markerId)
                 end
             end
-
-            DrawMarker( markerCache.type, coords, 
+            DrawMarker( markerCache.type, x, y, z, 
                         0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
-                        markerCache.x, markerCache.y, markerCache.z, 
+                        sx, sy, sz, 
                         rgb.r, rgb.g, rgb.b, rgb.a, 
                         false, true, 2, false, false, false, false)
 
@@ -112,7 +127,7 @@ end
 -- Test Events: 
 
 AddEventHandler("rrp_base:inMarker", function(resourceName, markerId)
-    print("it", resourceName, markerId)
+    print("in", resourceName, markerId)
 end)
 
 AddEventHandler("rrp_base:outMarker", function(resourceName, markerId)
@@ -132,8 +147,10 @@ end)
 
 AddEventHandler("rrp_base:changedPed", function(ped)
     print("ped", ped)
-
 end)
+
+TriggerEvent('rrp_base:registerMarker', GetCurrentResourceName(), "asd", 1, GetEntityCoords(PlayerPedId()), vector3(1.0, 1.0, 1.0), 200, 0, 0, 200, 20.0)
+
 
 
 
