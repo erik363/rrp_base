@@ -1,14 +1,11 @@
 RegisterNetEvent('rrp_base:changedPed')
-RegisterNetEvent('rrp_base:inVehicle')
-RegisterNetEvent('rrp_base:outVehicle')
+RegisterNetEvent('rrp_base:isPedInAnyVehicle')
 RegisterNetEvent('rrp_base:inMarker')
 RegisterNetEvent('rrp_base:outMarker')
+RegisterNetEvent('rrp_base:registerMarker')
 
-local Markers = {
-    --["test"] = {
-        --["asd"] = {type = 1, coords = vector3(339.5, -1397.3, 32.5), vector3(1.0, 1.0, 1.0), rgb = {r = 255, g = 0, b = 0, a = 200}, distance = 20.0}
-    --}
-}
+local Markers = {}
+local playerCoords = GetEntityCoords(PlayerPedId())
 
 AddEventHandler('onResourceStop', function(resourceName)
     if (GetCurrentResourceName() ~= resourceName) then
@@ -17,23 +14,37 @@ AddEventHandler('onResourceStop', function(resourceName)
     end
 end)
   
-RegisterNetEvent('rrp_base:registerMarker')
-AddEventHandler('rrp_base:registerMarker', function(resourceName, markerId, t, coords, size, r, g, b, a, visDist)
+AddEventHandler('rrp_base:registerMarker', function(resourceName, markerId, markerData, onlyShow, cb, key)
     local markerdatas = {
-        type = t,
-        coords = coords,
-        size = size,
+        type = markerData.t or 1,
+        coords = markerData.coords,
+        size = markerData.size or vector3(1.0, 1.0, 1.0),
         rgb = {
-            r = math.floor(r),
-            g = math.floor(g),
-            b = math.floor(b),
-            a = math.floor(a),
+            r = math.floor(markerData.rgb.r or 0),
+            g = math.floor(markerData.rgb.g or 0),
+            b = math.floor(markerData.rgb.b or 0),
+            a = math.floor(markerData.rgb.a or 0),
         },
-        visDist = visDist
+        visDist = markerData.visDist or 20.0,
+        cb = cb,
+        key = key,
+        onlyShow = onlyShow or 1,
+        meta = markerData.meta,
+        dir = markerData.pos or vector3(0.0, 0.0, 0.0),
+        rot = markerData.pos or vector3(0.0, 0.0, 0.0),
+        bobUpAndDown = markerData.bobUpAndDown or false,
+        faceCamera = markerData.faceCamera or true,
+        p19 = markerData.p19 or 2,
+        rotate = markerData.rotate or false,
+        textureDict = markerData.textureDict or nil,
+        textureName = markerData.textureName or nil,
+        drawOnEnts = markerData.drawOnEnts or false,
+        trigger = markerData.trigger or false,
     }
+    markerdatas.trueMarkerSize = markerData.trueMarkerSize or markerdatas.size.x
+    markerdatas.trueMarkerSize = markerdatas.trueMarkerSize / 2 * 1.12
     addMarker(resourceName, markerId, markerdatas)
 end)
-
 
 function addMarker(resourceName, markerId, markerdatas)
     if Markers[resourceName] == nil then
@@ -48,7 +59,10 @@ function removeMarker(resourceName, markerId)
     end
 end
 
-local playerCoords = GetEntityCoords(PlayerPedId())
+
+local pedInVehicle = false
+
+
 Citizen.CreateThread(function()
     local playerPed = PlayerPedId()
     local notSended = true
@@ -62,9 +76,11 @@ Citizen.CreateThread(function()
         if inVeh ~= IsPedInAnyVehicle(playerPed, false) then
             inVeh = IsPedInAnyVehicle(playerPed, false)
             if inVeh then
-                TriggerEvent('rrp_base:inVehicle')
+                pedInVehicle = true
+                TriggerEvent('rrp_base:isPedInAnyVehicle', true, GetVehiclePedIsIn(playerPed, false))
             else
-                TriggerEvent('rrp_base:outVehicle')
+                pedInVehicle = false
+                TriggerEvent('rrp_base:isPedInAnyVehicle', false, GetVehiclePedIsIn(playerPed, true))
             end
         end
     
@@ -76,12 +92,14 @@ Citizen.CreateThread(function()
     while true do
         for resourceName, data in pairs(Markers) do
             for markerId, marker in pairs(data) do
-                if #(playerCoords - marker.coords) < marker.visDist then
-                    drawMarker(resourceName, markerId)
+                if (( not marker.onlyShow) or (marker.onlyShow == 2 and pedInVehicle) or (marker.onlyShow == 1 and not pedInVehicle)) then
+                    if #(playerCoords - marker.coords) < marker.visDist then
+                        drawMarker(resourceName, markerId)
+                    end
                 end
             end
         end
-        Wait(100)
+        Wait(500)
     end
 end)
 
@@ -95,37 +113,66 @@ function drawMarker(resourceName, markerId)
         local coords = markerCache.coords
         local visibilityDistance = markerCache.visDist
         local distance = #(playerCoords - coords)
-        local markerSize = size.x
+        local markerSize = markerCache.trueMarkerSize
         local rgb = markerCache.rgb
         local playerInMarker = false
-        while distance <= visibilityDistance do
+        local key = markerCache.key
+        local pressed = false
+        local inVeh = pedInVehicle
+        while distance <= visibilityDistance and inVeh == pedInVehicle and Markers[resourceName] do
             if distance < markerSize then
                 if playerInMarker == false then
                     playerInMarker = true
-                    TriggerEvent("rrp_base:inMarker", resourceName, markerId)
+                    if markerCache.trigger == true then
+                        TriggerEvent("rrp_base:inMarker", resourceName, markerId, markerCache.meta)
+                    end
+                    if not key and markerCache.cb then
+                        pressed = true
+                        markerCache.cb(1, markerCache.meta)
+                    end
+                end
+                if key then
+                    if IsControlJustReleased(0, key) then
+                        markerCache.cb(1, markerCache.meta)
+                        pressed = true
+                        break
+                    end
                 end
             else
                 if playerInMarker == true then
                     playerInMarker = false
-                    TriggerEvent("rrp_base:outMarker", resourceName, markerId)
+                    if markerCache.trigger == true then
+                        TriggerEvent("rrp_base:outMarker", resourceName, markerId, markerCache.meta)
+                    end
+                    if not key and markerCache.cb then
+                        pressed = true
+                        markerCache.cb(0, markerCache.meta)
+                    end
                 end
             end
-            DrawMarker( markerCache.type, x, y, z, 
-                        0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 
-                        sx, sy, sz, 
-                        rgb.r, rgb.g, rgb.b, rgb.a, 
-                        false, true, 2, false, false, false, false)
-
+            if rgb.a > 0 then
+                DrawMarker( markerCache.type, x, y, z, 
+                            markerCache.dir, markerCache.rot, 
+                            sx, sy, sz, 
+                            rgb.r, rgb.g, rgb.b, rgb.a, 
+                            markerCache.bobUpAndDown, markerCache.faceCamera, markerCache.p19, 
+                            markerCache.rotate, markerCache.textureDict, markerCache.textureName, markerCache.drawOnEnts)
+            end
             distance = #(playerCoords - coords)
             Wait(0)
         end
-
-        addMarker(resourceName, markerId, markerCache)
+        if Markers[resourceName] then
+            if not pressed and markerCache.cb then
+                markerCache.cb(-1, markerCache.meta)
+            end
+            Wait(1000)
+            addMarker(resourceName, markerId, markerCache)
+        end
     end)
 end
 
 -- Test Events: 
-
+--[[
 AddEventHandler("rrp_base:inMarker", function(resourceName, markerId)
     print("in", resourceName, markerId)
 end)
@@ -135,21 +182,13 @@ AddEventHandler("rrp_base:outMarker", function(resourceName, markerId)
 
 end)
 
-AddEventHandler("rrp_base:inVehicle", function(resourceName, markerId)
-    print("inveh")
-
-end)
-
-AddEventHandler("rrp_base:outVehicle", function(resourceName, markerId)
-    print("outveh")
-
-end)
-
 AddEventHandler("rrp_base:changedPed", function(ped)
     print("ped", ped)
 end)
+]]
 
-TriggerEvent('rrp_base:registerMarker', GetCurrentResourceName(), "asd", 1, GetEntityCoords(PlayerPedId()), vector3(1.0, 1.0, 1.0), 200, 0, 0, 200, 20.0)
+
+
 
 
 

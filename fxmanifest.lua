@@ -1,7 +1,6 @@
 fx_version 'adamant'
 lua54 'yes'
 
-
 game 'gta5'
 
 description 'RRP Base, email: erik3630@gmail.com'
