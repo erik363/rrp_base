@@ -15,20 +15,16 @@ AddEventHandler('onResourceStop', function(resourceName)
 end)
   
 AddEventHandler('rrp_base:registerMarker', function(resourceName, markerId, markerData, onlyShow, cb, key)
+    
     local markerdatas = {
         type = markerData.t or 1,
         coords = markerData.coords,
         size = markerData.size or vector3(1.0, 1.0, 1.0),
-        rgb = {
-            r = math.floor(markerData.rgb.r or 0),
-            g = math.floor(markerData.rgb.g or 0),
-            b = math.floor(markerData.rgb.b or 0),
-            a = math.floor(markerData.rgb.a or 0),
-        },
+    
         visDist = markerData.visDist or 20.0,
         cb = cb,
         key = key,
-        onlyShow = onlyShow or 1,
+        onlyShow = onlyShow,
         meta = markerData.meta,
         dir = markerData.pos or vector3(0.0, 0.0, 0.0),
         rot = markerData.pos or vector3(0.0, 0.0, 0.0),
@@ -41,9 +37,29 @@ AddEventHandler('rrp_base:registerMarker', function(resourceName, markerId, mark
         drawOnEnts = markerData.drawOnEnts or false,
         trigger = markerData.trigger or false,
     }
-    markerdatas.trueMarkerSize = markerData.trueMarkerSize or markerdatas.size.x
-    markerdatas.trueMarkerSize = markerdatas.trueMarkerSize / 2 * 1.12
+    if markerData.rgb then
+        markerdatas.rgb = {
+            r = math.floor(markerData.rgb.r or 0),
+            g = math.floor(markerData.rgb.g or 0),
+            b = math.floor(markerData.rgb.b or 0),
+            a = math.floor(markerData.rgb.a or 0),  
+        }
+    else
+        markerdatas.rgb = {
+            r = 100,
+            g = 100,
+            b = 100,
+            a = 200,  
+        }
+    end
+    markerdatas.trueMarkerSize = markerData.trueMarkerSize or markerdatas.size.x * 1.12
+    markerdatas.drawing = false
     addMarker(resourceName, markerId, markerdatas)
+end)
+
+AddEventHandler('rrp_base:removeMarker', function(resourceName, markerId)
+    removeMarker(resourceName, markerId)
+    print(resourceName, markerId)
 end)
 
 function addMarker(resourceName, markerId, markerdatas)
@@ -84,7 +100,7 @@ Citizen.CreateThread(function()
             end
         end
     
-        Wait(500)
+        Wait(200)
     end
 end)
 
@@ -94,19 +110,23 @@ Citizen.CreateThread(function()
             for markerId, marker in pairs(data) do
                 if (( not marker.onlyShow) or (marker.onlyShow == 2 and pedInVehicle) or (marker.onlyShow == 1 and not pedInVehicle)) then
                     if #(playerCoords - marker.coords) < marker.visDist then
-                        drawMarker(resourceName, markerId)
+                        if marker.drawing == false then
+                            marker.drawing = true
+                            drawMarker(resourceName, markerId)
+                        end
                     end
                 end
             end
         end
-        Wait(500)
+        Wait(200)
     end
 end)
 
 function drawMarker(resourceName, markerId)
     Citizen.CreateThread(function()
         local markerCache = Markers[resourceName][markerId]
-        removeMarker(resourceName, markerId)
+
+        --removeMarker(resourceName, markerId)
         local x,y,z = markerCache.coords.x, markerCache.coords.y, markerCache.coords.z
         local size = markerCache.size
         local sx, sy, sz = size.x, size.y, size.z
@@ -119,7 +139,8 @@ function drawMarker(resourceName, markerId)
         local key = markerCache.key
         local pressed = false
         local inVeh = pedInVehicle
-        while distance <= visibilityDistance and inVeh == pedInVehicle and Markers[resourceName] do
+        local markers = Markers[resourceName]
+        while distance <= visibilityDistance and inVeh == pedInVehicle and Markers[resourceName] and markers[markerId] do
             if distance < markerSize then
                 if playerInMarker == false then
                     playerInMarker = true
@@ -162,11 +183,13 @@ function drawMarker(resourceName, markerId)
             Wait(0)
         end
         if Markers[resourceName] then
-            if not pressed and markerCache.cb then
-                markerCache.cb(-1, markerCache.meta)
+            if Markers[resourceName][markerId] then
+                if not pressed and markerCache.cb then
+                    markerCache.cb(-1, markerCache.meta)
+                end
+                --addMarker(resourceName, markerId, markerCache)
+                markerCache.drawing = false
             end
-            Wait(1000)
-            addMarker(resourceName, markerId, markerCache)
         end
     end)
 end
