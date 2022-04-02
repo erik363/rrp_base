@@ -17,5 +17,8 @@ client_scripts {
 	'client/main.lua'
 }
 
+export 'registerMarker'
+export 'removeMarker'
+
 
 

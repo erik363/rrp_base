@@ -13,9 +13,8 @@ AddEventHandler('onResourceStop', function(resourceName)
         return
     end
 end)
-  
-AddEventHandler('rrp_base:registerMarker', function(resourceName, markerId, markerData, onlyShow, cb, key)
-    
+
+function registerMarker(resourceName, markerId, markerData, onlyShow, cb, key)
     local markerdatas = {
         type = markerData.t or 1,
         coords = markerData.coords,
@@ -36,6 +35,7 @@ AddEventHandler('rrp_base:registerMarker', function(resourceName, markerId, mark
         textureName = markerData.textureName or nil,
         drawOnEnts = markerData.drawOnEnts or false,
         trigger = markerData.trigger or false,
+        text = markerData.text
     }
     if markerData.rgb then
         markerdatas.rgb = {
@@ -55,12 +55,11 @@ AddEventHandler('rrp_base:registerMarker', function(resourceName, markerId, mark
     markerdatas.trueMarkerSize = markerData.trueMarkerSize or markerdatas.size.x * 1.12
     markerdatas.drawing = false
     addMarker(resourceName, markerId, markerdatas)
-end)
-
-AddEventHandler('rrp_base:removeMarker', function(resourceName, markerId)
-    removeMarker(resourceName, markerId)
-    print(resourceName, markerId)
-end)
+end
+  
+function removeMarker(resourceName, markerId)
+    rmMarker(resourceName, markerId)
+end
 
 function addMarker(resourceName, markerId, markerdatas)
     if Markers[resourceName] == nil then
@@ -69,7 +68,7 @@ function addMarker(resourceName, markerId, markerdatas)
     Markers[resourceName][markerId]= markerdatas
 end
 
-function removeMarker(resourceName, markerId)
+function rmMarker(resourceName, markerId)
     if Markers[resourceName] then
         Markers[resourceName][markerId] = nil
     end
@@ -125,8 +124,6 @@ end)
 function drawMarker(resourceName, markerId)
     Citizen.CreateThread(function()
         local markerCache = Markers[resourceName][markerId]
-
-        --removeMarker(resourceName, markerId)
         local x,y,z = markerCache.coords.x, markerCache.coords.y, markerCache.coords.z
         local size = markerCache.size
         local sx, sy, sz = size.x, size.y, size.z
@@ -134,12 +131,13 @@ function drawMarker(resourceName, markerId)
         local visibilityDistance = markerCache.visDist
         local distance = #(playerCoords - coords)
         local markerSize = markerCache.trueMarkerSize
-        local rgb = markerCache.rgb
+        local red, green, blue, alpha = markerCache.rgb.r, markerCache.rgb.g, markerCache.rgb.b, markerCache.rgb.a
         local playerInMarker = false
         local key = markerCache.key
         local pressed = false
         local inVeh = pedInVehicle
         local markers = Markers[resourceName]
+        local text = markerCache.text
         while distance <= visibilityDistance and inVeh == pedInVehicle and Markers[resourceName] and markers[markerId] do
             if distance < markerSize then
                 if playerInMarker == false then
@@ -159,6 +157,9 @@ function drawMarker(resourceName, markerId)
                         break
                     end
                 end
+                if text then
+                    ShowHelpNotification(text)
+                end
             else
                 if playerInMarker == true then
                     playerInMarker = false
@@ -171,11 +172,11 @@ function drawMarker(resourceName, markerId)
                     end
                 end
             end
-            if rgb.a > 0 then
+            if alpha > 0 then
                 DrawMarker( markerCache.type, x, y, z, 
                             markerCache.dir, markerCache.rot, 
                             sx, sy, sz, 
-                            rgb.r, rgb.g, rgb.b, rgb.a, 
+                            red, green, blue, alpha, 
                             markerCache.bobUpAndDown, markerCache.faceCamera, markerCache.p19, 
                             markerCache.rotate, markerCache.textureDict, markerCache.textureName, markerCache.drawOnEnts)
             end
@@ -191,7 +192,13 @@ function drawMarker(resourceName, markerId)
                 markerCache.drawing = false
             end
         end
+        collectgarbage("collect")
     end)
+end
+
+function ShowHelpNotification(msg)
+	AddTextEntry('esxHelpNotification', msg)
+	DisplayHelpTextThisFrame('esxHelpNotification', false)
 end
 
 -- Test Events: 
