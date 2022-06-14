@@ -9,7 +9,12 @@ local playerCoords = GetEntityCoords(PlayerPedId())
 
 AddEventHandler('onResourceStop', function(resourceName)
     if (GetCurrentResourceName() ~= resourceName) then
-        Markers[resourceName] = nil
+        if Markers[resourceName] then
+            for k, v in pairs(Markers[resourceName]) do    
+                v.delete = true
+            end
+            Markers[resourceName] = nil
+        end
         return
     end
 end)
@@ -70,7 +75,10 @@ end
 
 function rmMarker(resourceName, markerId)
     if Markers[resourceName] then
-        Markers[resourceName][markerId] = nil
+        if Markers[resourceName][markerId] then
+            Markers[resourceName][markerId].delete = true
+            Markers[resourceName][markerId] = nil
+        end
     end
 end
 
@@ -123,7 +131,13 @@ end)
 
 function drawMarker(resourceName, markerId)
     Citizen.CreateThread(function()
+        if not Markers[resourceName] then
+            return
+        end
         local markerCache = Markers[resourceName][markerId]
+        if not markerCache then
+            return
+        end
         local x,y,z = markerCache.coords.x, markerCache.coords.y, markerCache.coords.z
         local size = markerCache.size
         local sx, sy, sz = size.x, size.y, size.z
@@ -138,7 +152,7 @@ function drawMarker(resourceName, markerId)
         local inVeh = pedInVehicle
         local markers = Markers[resourceName]
         local text = markerCache.text
-        while distance <= visibilityDistance and inVeh == pedInVehicle and Markers[resourceName] and markers[markerId] do
+        while distance <= visibilityDistance and inVeh == pedInVehicle and not markerCache.delete do
             if distance < markerSize then
                 if playerInMarker == false then
                     playerInMarker = true
@@ -187,6 +201,8 @@ function drawMarker(resourceName, markerId)
             if Markers[resourceName][markerId] then
                 if not pressed and markerCache.cb then
                     markerCache.cb(-1, markerCache.meta)
+                elseif markerCache.cb then
+                    markerCache.cb(-1, markerCache.meta)
                 end
                 --addMarker(resourceName, markerId, markerCache)
                 markerCache.drawing = false
@@ -200,6 +216,18 @@ function ShowHelpNotification(msg)
 	AddTextEntry('esxHelpNotification', msg)
 	DisplayHelpTextThisFrame('esxHelpNotification', false)
 end
+
+AddEventHandler('rrp_base:registerMarker', function(t, resourceName, markerId, markerData, onlyShow, cb, key)
+    if t then
+        if type(cb) == 'string' then
+            local ok
+            ok, cb = pcall(load(cb))
+        end
+        registerMarker(resourceName, markerId, markerData, onlyShow, cb, key)
+    else
+        removeMarker(resourceName, markerId)
+    end
+end)
 
 -- Test Events: 
 --[[

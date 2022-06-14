@@ -10,7 +10,7 @@ author 'erik363'
 version '1.0.0'
 
 server_scripts {
-
+	'server/main.lua'
 }
 
 client_scripts {
@@ -19,6 +19,4 @@ client_scripts {
 
 export 'registerMarker'
 export 'removeMarker'
-
-
 
