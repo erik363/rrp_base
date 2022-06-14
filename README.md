@@ -2,4 +2,4 @@ Markers can be added or deleted.
 An event is sent when the player has entered or exited a vehicle.
 Sends an event if the player ped has changed.
 
-### I do not yet recommend its use, it is under development. Compatible with rrp_garage 1.0.0 ###
+### I do not yet recommend its use, it is under development. Compatible with rrp_adv_garage 1.0.0 ###
